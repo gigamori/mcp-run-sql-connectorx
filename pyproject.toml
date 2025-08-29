@@ -7,6 +7,7 @@ name = "run-sql-connectorx"
 version = "0.1.0"
 description = "MCP server to run SQL via ConnectorX and write CSV/Parquet in batches"
 authors = [{ name = "Your Name" }]
+license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

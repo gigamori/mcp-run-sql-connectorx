@@ -13,10 +13,17 @@ PyArrow `RecordBatch` chunks.
 
 ```bash
 uvx run-sql-connectorx \
-  --dsn "<connectorx_dsn>"
+  --conn "<connection_token>"
 ```
 
-`<connectorx_dsn>` can be any DSN that ConnectorX understands (SQLite, PostgreSQL, BigQuery, …).
+<connection_token> is the **connection token** (*conn*) used by ConnectorX—SQLite, PostgreSQL, BigQuery, and more.
+
+> ℹ️  ConnectorX terminology: the string that represents a database connection is called a **connection token** (`conn`).  This README still uses the more common term **DSN** for brevity; treat them as synonyms.
+
+### Further reading
+
+* ConnectorX repository: <https://github.com/sfu-db/connector-x/>
+* Connection-token (DSN) formats for each database: <https://github.com/sfu-db/connector-x/tree/main/docs/databases>
 
 ### Running from *mcp.json*
 
@@ -31,7 +38,7 @@ To launch the server from an MCP-aware client such as **Cursor**, add the follow
       "args": [
         "--from", "git+https://github.com/gigamori/mcp-run-sql-connectorx",
         "run-sql-connectorx",
-        "--dsn", "<connectorx_dsn>"
+        "--conn", "<connection_token>"
       ]
     }
   }
@@ -76,4 +83,4 @@ The server exposes a single MCP tool **`run_sql`**.
 
 ## License
 
-MIT License
+Distributed under the MIT License. See `LICENSE` for details.

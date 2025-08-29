@@ -22,7 +22,7 @@ Purpose:
 
 How to start the server:
   uvx run-sql-connectorx \
-    --dsn <connectorx_dsn>
+    --conn <connection_token>
 
 Exposed MCP tool: run_sql
   Parameters:
@@ -38,7 +38,7 @@ Exposed MCP tool: run_sql
 def _parse_args() -> argparse.Namespace:
   parser = argparse.ArgumentParser(description="MCP Server: ConnectorX -> CSV/Parquet (RecordBatch streaming)")
 
-  parser.add_argument("--dsn", required=True, help="ConnectorX DSN (server-wide, fixed)")
+  parser.add_argument("--conn", required=True, help="ConnectorX connection token (server-wide, fixed)")
 
   return parser.parse_args()
 
@@ -84,25 +84,24 @@ def _handle_connectorx_error(error_msg: str, vendor: str) -> None:
 
 # -------- record batch iterator via ConnectorX --------
 
-def _iter_record_batches(dsn: str, sql_text: str, batch_size: int) -> Iterator[pa.RecordBatch]:
+def _iter_record_batches(conn: str, sql_text: str, batch_size: int) -> Iterator[pa.RecordBatch]:
   import connectorx as cx  # type: ignore
   from urllib.parse import urlparse
   
-  # DSN解析によるデータベース種別判定
-  parsed_dsn = urlparse(dsn)
-  db_type = parsed_dsn.scheme
+  # Determine database type from the connection token scheme
+  parsed_conn = urlparse(conn)
+  db_type = parsed_conn.scheme
   
-  # ・・・
+  # Re-raise using the shared error-handling helper
   try:
-    stream = cx.read_sql(dsn, sql_text, return_type="arrow_stream", batch_size=batch_size)
+    stream = cx.read_sql(conn, sql_text, return_type="arrow_stream", batch_size=batch_size)
   except Exception as e:
-    # 共通のエラーハンドリング関数を使用
     _handle_connectorx_error(str(e), db_type)
   
-  # ストリーミング処理
+  # Stream the resulting record batches
   for rb in stream:  # type: ignore
     if not isinstance(rb, pa.RecordBatch):
-      # 一部実装ではpyarrow.Tableを返す可能性に備える
+      # Some ConnectorX back-ends may yield a pyarrow.Table instead; split into batches
       if isinstance(rb, pa.Table):
         for b in rb.to_batches(max_chunksize=batch_size):
           yield b
@@ -111,13 +110,9 @@ def _iter_record_batches(dsn: str, sql_text: str, batch_size: int) -> Iterator[p
     else:
       yield rb
 
-
-# -------- (Unused) DSN decoration placeholder removed --------
-
-
 # -------- MCP server --------
 
-def run_server(dsn: str) -> None:
+def run_server(conn: str) -> None:
   import asyncio
   from mcp.server import Server  # type: ignore
   import mcp.server.stdio  # type: ignore
@@ -126,8 +121,8 @@ def run_server(dsn: str) -> None:
   from mcp.server import NotificationOptions  # type: ignore
 
   server = Server("run-sql-connectorx")
-  run_server._dsn = dsn  # type: ignore
-  run_server._eager_connect = True  # type: ignore  # 常に即時接続チェックを有効化
+  run_server._conn = conn  # type: ignore
+  run_server._eager_connect = True  # type: ignore  # Always perform an eager connection check
 
   def tool_spec():
     return types.Tool(
@@ -172,14 +167,14 @@ def run_server(dsn: str) -> None:
       if out.exists():
         out.unlink()
 
-      # ConnectorXを使用してデータを取得
-      batches = _iter_record_batches(run_server._dsn, sql_text, batch_size)  # type: ignore
+      # Retrieve data via ConnectorX
+      batches = _iter_record_batches(run_server._conn, sql_text, batch_size)  # type: ignore
       
       if output_format == "csv":
-        # ヘッダは常に出力
+        # Always write the header row
         first = next(batches, None)
         if first is None:
-          # 空結果でもヘッダのみ出力（列情報は取得不可のため空ファイルとする）
+          # Empty result set: create an empty file (no column info available)
           with out.open("w", newline="", encoding="utf-8") as fp:
             pass
         else:
@@ -190,7 +185,7 @@ def run_server(dsn: str) -> None:
               yield b
           _write_csv_batches(header, chain_batches(), out)
       else:
-        # Parquet: 空結果なら空のTableで作成
+        # Parquet: write an empty table when the result set is empty
         first = next(batches, None)
         if first is None:
           table = pa.table({})
@@ -204,17 +199,17 @@ def run_server(dsn: str) -> None:
 
       return [types.TextContent(type="text", text="OK")]
     except Exception as e:
-      # 失敗時は残骸削除
+      # Cleanup any partial output on failure
       try:
         if "out" in locals() and isinstance(out, Path) and out.exists():
           out.unlink()
       except Exception:
         pass
       
-      # エラー種別に応じた詳細メッセージ
+      # Build a detailed error message based on the error category
       error_msg = str(e)
       
-      # ファイル関連エラー
+      # File-related errors
       if "sql is empty" in error_msg:
         detailed_msg = f"SQL file error: The SQL file '{sql_file}' is empty or contains only whitespace."
       elif "No such file" in error_msg or "FileNotFoundError" in error_msg:
@@ -222,19 +217,19 @@ def run_server(dsn: str) -> None:
       elif "PermissionError" in error_msg:
         detailed_msg = f"Permission denied: Cannot read SQL file '{sql_file}' or write to output directory."
       
-      # 引数関連エラー
+      # Argument-related errors
       elif "invalid arguments" in error_msg:
         detailed_msg = f"Invalid arguments: Required parameters are sql_file, output_path, and output_format (csv or parquet)."
       
-      # データベース接続エラー（既に詳細化済み）
+      # Database connection errors (already detailed)
       elif "BigQuery" in error_msg or "SQLite" in error_msg or "PostgreSQL" in error_msg or "MySQL" in error_msg:
         detailed_msg = error_msg
       
-      # その他のエラー
+      # Fallback for any other error
       else:
         detailed_msg = f"Execution failed: {error_msg}"
       
-      # デバッグ用のトレースバック（開発時）
+      # Print traceback for debugging
       import traceback
       print(f"Full traceback:\n{traceback.format_exc()}", file=sys.stderr)
       
@@ -268,34 +263,34 @@ def run_server(dsn: str) -> None:
   run_sync()
 
 
-def _validate_connection(dsn: str) -> None:
-  """起動時にデータベース接続を検証する。
+def _validate_connection(conn: str) -> None:
+  """Validate the database connection at start-up.
 
-  - BigQuery: DSN形式の基本チェックと実際の接続テスト
-  - SQLite: インメモリまたはファイルパスの妥当性確認
-  - その他: DSN基本構造の確認と実際の接続テスト
+  * BigQuery   – Basic connection-token checks and an actual connection test
+  * SQLite     – Validate in-memory or file path usage
+  * Others     – Basic connection-token structure check and connection test
   """
   from urllib.parse import urlparse, parse_qsl
 
-  parsed = urlparse(dsn)
+  parsed = urlparse(conn)
   vendor = (parsed.scheme or "").lower()
 
   if not vendor:
-    raise RuntimeError("DSN format error: missing scheme (e.g., postgresql://, bigquery://, sqlite://)")
+    raise RuntimeError("Connection token error: missing scheme (e.g., postgresql://, bigquery://, sqlite://)")
 
-  # BigQuery: パス部分に認証ファイルパスがあることを確認
+  # BigQuery: verify that the path part contains a credentials file
   if vendor.startswith("bigquery"):
-    # パス部分が空でないことを確認（認証ファイルパスが必要）
+    # Ensure credentials path is provided
     if not parsed.path or parsed.path == "/":
-      raise RuntimeError("BigQuery DSN error: missing authentication file path (format: bigquery:///path/to/auth.json)")
+      raise RuntimeError("BigQuery connection token error: missing authentication file path (format: bigquery:///path/to/auth.json)")
     return
 
-  # SQLite: ファイル系の場合は親ディレクトリの存在を確認（:memory: は許可）
+  # SQLite: if it is a file database, ensure the parent directory exists (:memory: is allowed)
   if vendor.startswith("sqlite"):
-    # インメモリデータベース（sqlite://:memory:）の場合はスキップ
+    # Skip check for in-memory database (sqlite://:memory:)
     if parsed.netloc == ":memory:":
       return
-    # ファイルパスの場合は親ディレクトリの存在を確認
+    # For file databases, confirm the parent directory exists
     path = (parsed.path or "").lstrip("/")
     if path:
       parent = Path(path).expanduser().resolve().parent
@@ -303,18 +298,18 @@ def _validate_connection(dsn: str) -> None:
         raise RuntimeError(f"SQLite path error: parent directory does not exist: {parent}")
     return
 
-  # その他ベンダ: 最低限、ホスト相当の情報があるかを検査（接続は実行しない）
-  # 例: postgresql://user:pass@host:5432/db
+  # Other vendors: at minimum, ensure host info is present (no connection attempt yet)
+  # e.g. postgresql://user:pass@host:5432/db
   if not (parsed.netloc or parsed.hostname):
-    raise RuntimeError(f"DSN format error: missing host in DSN for vendor '{vendor}'")
-  # ここではネットワーク接続は行わない（ハング回避）。
+    raise RuntimeError(f"Connection token error: missing host in token for vendor '{vendor}'")
+  # Do not attempt a network connection here to avoid hangs
 
-  # 実際の接続テストを実行（全てのベンダーで共通）
+  # Perform a real connection test (common to all vendors)
   try:
     import connectorx as cx  # type: ignore
-    result = cx.read_sql(dsn, "SELECT 1", return_type="arrow")  # type: ignore
+    result = cx.read_sql(conn, "SELECT 1", return_type="arrow")  # type: ignore
   except Exception as conn_exc:
-    # 共通のエラーハンドリング関数を使用
+    # Use the shared error handler
     _handle_connectorx_error(str(conn_exc), vendor)
 
 
@@ -322,8 +317,8 @@ def main() -> None:
   args = _parse_args()
   try:
     # Validate database connection before starting the MCP server
-    _validate_connection(args.dsn)
-    run_server(dsn=args.dsn)
+    _validate_connection(args.conn)
+    run_server(conn=args.conn)
   except Exception as exc:
     print(f"Error: {exc}", file=sys.stderr)
     print(f"\n{DOC_USAGE}", file=sys.stderr)

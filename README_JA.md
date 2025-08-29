@@ -12,7 +12,7 @@ ConnectorX を使用して任意の DSN に対して SQL を実行し、その�
 
 ```bash
 uvx run-sql-connectorx \
-  --dsn "<connectorx_dsn>"
+  --conn "<connection_token>"
 ```
 
 ### mcp.json から起動する場合
@@ -25,33 +25,40 @@ MCP 対応クライアント（例: Cursor）から本サーバを起動する�
     "run-sql-connectorx": {
       "command": "uvx",
       "args": [
-        "--from", "git+https://github.com/gigamori/mcp-run-sql-connectorx",
         "run-sql-connectorx",
-        "--dsn", "<connectorx_dsn>"
+        "--conn", "<connection_token>"
       ]
     }
   }
 }
 ```
 
+# 追加情報
+
+* ConnectorX 公式リポジトリ: <https://github.com/sfu-db/connector-x/>
+* 各データベース用接続トークン（conn）の一覧: <https://github.com/sfu-db/connector-x/tree/main/docs/databases>
+
+> **用語について**  
+> ConnectorX では接続文字列を *connection token* (`conn`) と呼びます。本 README では便宜上 DSN と同義として扱います。
+
 ## 挙動と制限
 
-* **ストリーミング**: ConnectorX から RecordBatch 単位で結果を取得し、既定 `batch_size` は `100 000` 行です。
+* **ストリーミング**: ConnectorX から RecordBatch 単位で結果を取得（既定 `batch_size` = 100&nbsp;000 行）
 * **空結果**:
-  * CSV – ヘッダ行のみ（空ファイル）
+  * CSV – ヘッダ行のみの空ファイルを作成
   * Parquet – 空のテーブルを書き込み
 * **エラー処理**: 例外発生時には出力ファイルを削除します。
 
 ## MCP ツール仕様
 
-ツール名: **`run_sql`**
+公開ツール: **`run_sql`**
 
 | 引数 | 型 | 必須 | 説明 |
 |------|----|------|------|
-| `sql_file` | string | yes | 実行する SQL を含むファイルパス |
-| `output_path` | string | yes | 出力ファイルパス |
-| `output_format` | enum | yes | `"csv"` または `"parquet"` |
-| `batch_size` | int | no | RecordBatch サイズ（既定 `100000`） |
+| `sql_file` | string | ◯ | 実行する SQL を含むファイルパス |
+| `output_path` | string | ◯ | 結果を書き込むファイルパス |
+| `output_format` | enum | ◯ | `"csv"` または `"parquet"` |
+| `batch_size` | int | – | RecordBatch サイズ（既定 100&nbsp;000） |
 
 ### 使用例
 
@@ -71,4 +78,4 @@ MCP 対応クライアント（例: Cursor）から本サーバを起動する�
 
 ## ライセンス
 
-MIT License
+本プロジェクトは MIT License の下で配布されています。詳細は `LICENSE` を参照してください。
