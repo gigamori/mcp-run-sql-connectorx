@@ -1,4 +1,6 @@
 .cursor/
 .specstory/
 .venv/
+.cursorindexingignore
+tmp/
 uv.lock
