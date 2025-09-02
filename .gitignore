@@ -1,6 +1,8 @@
+**/__pycache__/**
 .cursor/
 .specstory/
 .venv/
 .cursorindexingignore
+build/
 tmp/
 uv.lock

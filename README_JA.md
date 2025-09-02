@@ -8,6 +8,29 @@ ConnectorX を使用して任意の DSN に対して SQL を実行し、その�
 * **返却値**: 成功時は文字列 `"OK"`、失敗時は `"Error: <message>"`
 * 失敗時は作成中の出力ファイルを削除します
 
+## このライブラリの狙い
+
+- **大規模データに強い**: Arrow の `RecordBatch` 単位でストリーミング処理
+- **MCP でトークン効率が良い**: データはインラインではなくファイルで受け渡し
+- **ConnectorX による多種 DB 対応**: ひとつのツールで複数バックエンドに対応
+- **堅牢な入出力**: CSV ヘッダ出力、Parquet スキーマ検証、例外時の安全な後片付け
+
+## ConnectorX の対応データソース
+
+代表的な対応先は以下の通りです。
+
+- **PostgreSQL**
+- **MySQL / MariaDB**
+- **SQLite**
+- **Microsoft SQL Server**
+- **Amazon Redshift**
+- **Google BigQuery**
+
+最新かつ網羅的な対応一覧と接続トークン（conn）形式は公式ドキュメントを参照してください。
+
+- ConnectorX 公式リポジトリ: <https://github.com/sfu-db/connector-x/>
+- 各データベースの接続トークン一覧: <https://github.com/sfu-db/connector-x/tree/main/docs/databases>
+
 ## 起動方法
 
 ```bash
@@ -25,6 +48,7 @@ MCP 対応クライアント（例: Cursor）から本サーバを起動する�
     "run-sql-connectorx": {
       "command": "uvx",
       "args": [
+        "--from", "git+https://github.com/gigamori/mcp-run-sql-connectorx",
         "run-sql-connectorx",
         "--conn", "<connection_token>"
       ]
@@ -32,14 +56,6 @@ MCP 対応クライアント（例: Cursor）から本サーバを起動する�
   }
 }
 ```
-
-# 追加情報
-
-* ConnectorX 公式リポジトリ: <https://github.com/sfu-db/connector-x/>
-* 各データベース用接続トークン（conn）の一覧: <https://github.com/sfu-db/connector-x/tree/main/docs/databases>
-
-> **用語について**  
-> ConnectorX では接続文字列を *connection token* (`conn`) と呼びます。本 README では便宜上 DSN と同義として扱います。
 
 ## 挙動と制限
 

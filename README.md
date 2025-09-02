@@ -9,6 +9,29 @@ PyArrow `RecordBatch` chunks.
 * **Return value**: the string `"OK"` on success, or `"Error: <message>"` on failure
 * On failure the partially written output file is deleted
 
+## Why this library?
+
+- **Efficient streaming**: handles large results in Arrow `RecordBatch` chunks
+- **Token-efficient for MCP**: exchanges data via files instead of inline payloads
+- **Cross-database via ConnectorX**: one tool works across many backends
+- **Robust I/O**: CSV header handling, Parquet schema validation, safe cleanup on errors
+
+## Supported data sources (ConnectorX)
+
+ConnectorX supports many databases. Common examples include:
+
+- **PostgreSQL**
+- **MySQL / MariaDB**
+- **SQLite**
+- **Microsoft SQL Server**
+- **Amazon Redshift**
+- **Google BigQuery**
+
+For the complete and up-to-date list of supported databases and connection-token (DSN) formats, see the official docs:
+
+- ConnectorX repository: <https://github.com/sfu-db/connector-x/>
+- Database connection tokens: <https://github.com/sfu-db/connector-x/tree/main/docs/databases>
+
 ## Getting Started
 
 ```bash
@@ -18,12 +41,10 @@ uvx run-sql-connectorx \
 
 <connection_token> is the **connection token** (*conn*) used by ConnectorX—SQLite, PostgreSQL, BigQuery, and more.
 
-> ℹ️  ConnectorX terminology: the string that represents a database connection is called a **connection token** (`conn`).  This README still uses the more common term **DSN** for brevity; treat them as synonyms.
-
 ### Further reading
 
 * ConnectorX repository: <https://github.com/sfu-db/connector-x/>
-* Connection-token (DSN) formats for each database: <https://github.com/sfu-db/connector-x/tree/main/docs/databases>
+* Connection-token formats for each database: <https://github.com/sfu-db/connector-x/tree/main/docs/databases>
 
 ### Running from *mcp.json*
 
