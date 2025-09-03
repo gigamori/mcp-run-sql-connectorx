@@ -8,6 +8,7 @@ PyArrow `RecordBatch` chunks.
 * **Parquet**: PyArrow defaults; schema mismatch across batches raises an error
 * **Return value**: the string `"OK"` on success, or `"Error: <message>"` on failure
 * On failure the partially written output file is deleted
+* **CSV token counting (optional)**: per-line token counting via `tiktoken` (`o200k_base`) with a warning threshold
 
 ## Why this library?
 
@@ -27,7 +28,7 @@ ConnectorX supports many databases. Common examples include:
 - **Amazon Redshift**
 - **Google BigQuery**
 
-For the complete and up-to-date list of supported databases and connection-token (DSN) formats, see the official docs:
+For the complete and up-to-date list of supported databases and connection-token (`conn`) formats, see the official docs:
 
 - ConnectorX repository: <https://github.com/sfu-db/connector-x/>
 - Database connection tokens: <https://github.com/sfu-db/connector-x/tree/main/docs/databases>
@@ -36,10 +37,16 @@ For the complete and up-to-date list of supported databases and connection-token
 
 ```bash
 uvx run-sql-connectorx \
-  --conn "<connection_token>"
+  --conn "<connection_token>" \
+  --csv-token-threshold 500000
 ```
 
 <connection_token> is the **connection token** (*conn*) used by ConnectorX—SQLite, PostgreSQL, BigQuery, and more.
+
+## CLI options
+
+- `--conn <connection_token>` (required): ConnectorX connection token (`conn`)
+- `--csv-token-threshold <int>` (default `0`): when `> 0`, enable CSV per-line token counting using `tiktoken(o200k_base)`; the value is a warning threshold
 
 ### Further reading
 
@@ -71,9 +78,24 @@ To launch the server from an MCP-aware client such as **Cursor**, add the follow
 * **Streaming**: Results are streamed from ConnectorX in RecordBatch chunks; the default
   `batch_size` is `100 000` rows.
 * **Empty result**:
-  * CSV – an empty file is created (with header row)
+  * CSV – an empty file is created
   * Parquet – an empty table is written
 * **Error handling**: the output file is removed on any exception.
+* **CSV token counting (when `--csv-token-threshold > 0`)**:
+  - Counted text: exactly what `csv.writer` writes (including header row when present, delimiters, quotes, and newlines), UTF-8
+  - Streaming approach: tokenized with `tiktoken(o200k_base)` per written CSV line
+
+## Call output
+
+The tool returns a single text message.
+
+- On success:
+  - Parquet: `OK`
+  - CSV:
+    - If `--csv-token-threshold = 0`: `OK`
+    - If `--csv-token-threshold > 0`: `OK N tokens` (or `OK N tokens. Too many tokens may impair processing. Handle appropriately` when `N >= threshold`)
+    - Empty result with counting enabled: `OK 0 tokens`
+- On failure: `Error: <message>` (any partial output file is deleted)
 
 ## MCP Tool Specification
 

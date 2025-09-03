@@ -1,8 +1,13 @@
 **/__pycache__/**
+**/*.egg-info/
+build/
+dist/
+.venv/
+uv.lock
+
 .cursor/
 .specstory/
-.venv/
 .cursorindexingignore
-build/
+
+AGENTS.md
 tmp/
-uv.lock
