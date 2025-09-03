@@ -354,7 +354,7 @@ def run_server(conn: str, csv_token_threshold: int = 0) -> None:
           w,
           InitializationOptions(
             server_name="run-sql-connectorx",
-            server_version="0.1.0",
+            server_version="0.1.1",
             capabilities=server.get_capabilities(notification_options=NotificationOptions(), experimental_capabilities={}),
           ),
         )
